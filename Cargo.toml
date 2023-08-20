@@ -1,0 +1,11 @@
+[package]
+name = "learn-bevy"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = "0.11.0"
+bevy_ecs_ldtk = { git = "https://github.com/Trouv/bevy_ecs_ldtk" }
+bevy_rapier2d = "0.22.0"
