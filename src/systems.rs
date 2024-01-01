@@ -1,10 +1,32 @@
 use crate::components::*;
-use bevy::{prelude::*, utils::petgraph::algo::condensation};
+use bevy::{
+    prelude::*,
+    utils::petgraph::{algo::condensation, matrix_graph::Zero},
+};
 use bevy_ecs_ldtk::prelude::*;
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    f32::consts::PI,
+};
 
-use bevy_rapier2d::{geometry::Group, prelude::*};
+use bevy_rapier2d::{geometry::Group, na::ComplexField, prelude::*};
+
+pub const BLOCK: i32 = 0x10;
+pub const PIXEL: i32 = BLOCK / 16;
+pub const S_PIXEL: f32 = PIXEL as f32 / 16.;
+pub const SS_PIXEL: f32 = S_PIXEL / 16.;
+pub const SSS_PIXEL: f32 = SS_PIXEL / 16.;
+
+pub const MIN_WALK_SPEED: f32 = S_PIXEL + (3. * SS_PIXEL) * 60.;
+pub const MAX_WALK_SPEED: f32 = PIXEL as f32 + (9. * S_PIXEL) * 60.;
+
+pub const WALK_ACCELER: f32 = (9. * SS_PIXEL) + (8. * SSS_PIXEL) * 60.;
+pub const WALK_DECELER: f32 = 13. * SS_PIXEL * 60.;
+pub const SKIDD_DECELER: f32 = S_PIXEL + (10. * SS_PIXEL) * 60.;
+
+pub const METER: i32 = BLOCK;
+pub const PIXELS_PER_METER: i32 = METER / PIXEL;
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let camera = Camera2dBundle::default();
@@ -16,72 +38,45 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 }
 
-pub fn damage_handler(
-    mut commands: Commands,
-    mut damage_events: EventReader<DamageEvent>,
-    player_query: Query<Entity, (With<Player>, Without<Enemy>)>,
-    enemy_query: Query<Entity, (With<Enemy>, Without<Player>)>,
-) {
-    for event in damage_events.iter() {
-        match event {
-            DamageEvent::Given(target) => {
-                if enemy_query.get(*target).is_ok() {
-                    commands.entity(*target).despawn();
-                }
-            }
-            DamageEvent::Taken(_) => {
-                panic!("Game over!")
-            }
-        }
-    }
-}
-
-pub fn collision_handler(
-    attack_query: Query<(Entity, &AttackArea), (With<Player>, Without<Enemy>)>,
-    mut collision_events: EventReader<CollisionEvent>,
-    mut damage_writer: EventWriter<DamageEvent>,
-) {
-    if let Ok((player, attack_area)) = attack_query.get_single() {
-        for event in collision_events.iter() {
-            match event {
-                CollisionEvent::Started(e1, e2, _) => {
-                    if *e1 == player {
-                        damage_writer.send(DamageEvent::Given(*e2))
-                    }
-                }
-                CollisionEvent::Stopped(e1, e2, _) => {}
-            }
-        }
-    }
-}
-
-pub fn jump_attack(
-    mut commands: Commands,
-    mut query: Query<(Entity, &FallDetection), (With<Player>, Changed<FallDetection>)>,
-) {
-    for (entity, fall_detection) in &mut query {
-        if !fall_detection.is_falling {
-            continue;
-        }
-    }
-}
-
 pub fn movement(
     input: Res<Input<KeyCode>>,
-    mut query: Query<(&mut Velocity, &mut FallDetection, &GroundDetection), With<Player>>,
+    mut query: Query<(&mut Controls, &mut Velocity, &GroundDetection), With<Player>>,
 ) {
-    for (mut velocity, mut fall_detection, ground_detection) in &mut query {
+    for (mut controls, mut velocity, mut ground_detection) in &mut query {
         let right = if input.pressed(KeyCode::D) { 1. } else { 0. };
         let left = if input.pressed(KeyCode::A) { 1. } else { 0. };
 
-        // if player is falling down - set is_falling to true; else - false
-        fall_detection.is_falling = velocity.linvel.y < 0.0;
+        let direction = right - left;
+        if !direction.is_zero() {
+            controls.last_direction_input = direction;
+        }
 
-        velocity.linvel.x = (right - left) * 200.;
+        let mut accel_x: f32 = 0.;
+        if direction.is_zero() && velocity.linvel.x.abs() > 0. {
+            accel_x = -1. * velocity.linvel.x.signum() * WALK_DECELER;
+        }
+
+        if !direction.is_zero() {
+            accel_x = controls.last_direction_input * WALK_ACCELER;
+        }
+
+        if !direction.is_zero()
+            && controls.last_direction_input.signum() != velocity.linvel.x.signum()
+        {
+            accel_x = controls.last_direction_input * SKIDD_DECELER;
+        }
+
+        println!("{} - {}", velocity.linvel.x.abs(), S_PIXEL);
+        velocity.linvel.x = match velocity.linvel.x.abs() < S_PIXEL / 60. {
+            true => direction * MIN_WALK_SPEED,
+            false => velocity.linvel.x + accel_x,
+        };
 
         if input.just_pressed(KeyCode::Space) && (ground_detection.on_ground) {
             velocity.linvel.y = 700.;
         }
+
+        controls.last_direction_input = direction
     }
 }
 

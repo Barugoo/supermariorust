@@ -3,6 +3,10 @@ use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
 use systems::*;
+use systems::{
+    BLOCK, MAX_WALK_SPEED, METER, MIN_WALK_SPEED, PIXELS_PER_METER, SKIDD_DECELER, SSS_PIXEL,
+    SS_PIXEL, S_PIXEL,
+};
 
 mod components;
 mod systems;
@@ -12,10 +16,9 @@ fn main() {
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins((
             LdtkPlugin,
-            RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0),
+            RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(PIXELS_PER_METER as f32),
         ))
         .insert_resource(RapierConfiguration {
-            gravity: Vec2::new(0.0, -2000.0),
             ..Default::default()
         })
         .insert_resource(LevelSelection::Uid(0))
@@ -37,9 +40,6 @@ fn main() {
         .add_systems(Update, update_level_selection)
         .add_systems(Update, patrol)
         .add_systems(Update, restart_level)
-        .add_systems(Update, jump_attack)
-        .add_systems(Update, damage_handler)
-        .add_event::<DamageEvent>()
         .register_ldtk_int_cell::<components::WallBundle>(1)
         .register_ldtk_entity::<components::PlayerBundle>("Player")
         .register_ldtk_entity::<components::MobBundle>("Enemy")

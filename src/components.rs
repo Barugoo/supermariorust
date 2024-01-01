@@ -11,9 +11,12 @@ pub struct ColliderBundle {
     pub rigid_body: RigidBody,
     pub velocity: Velocity,
     pub rotation_constraints: LockedAxes,
-    pub gravity_scale: GravityScale,
     pub friction: Friction,
-    pub density: ColliderMassProperties,
+}
+
+#[derive(Clone, Default, Component)]
+pub struct Controls {
+    pub last_direction_input: f32,
 }
 
 #[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]
@@ -30,12 +33,8 @@ impl From<&EntityInstance> for ColliderBundle {
 
         match entity_instance.identifier.as_ref() {
             "Player" => ColliderBundle {
-                collider: Collider::cuboid(6., 14.),
-                rigid_body: RigidBody::Dynamic,
-                friction: Friction {
-                    coefficient: 0.0,
-                    combine_rule: CoefficientCombineRule::Min,
-                },
+                collider: Collider::cuboid(6.5, 8.),
+                rigid_body: RigidBody::KinematicVelocityBased,
                 rotation_constraints,
                 ..Default::default()
             },
@@ -119,10 +118,10 @@ pub struct PlayerBundle {
     #[from_entity_instance]
     pub collider_bundle: ColliderBundle,
     pub player: Player,
+    pub controls: Controls,
     #[worldly]
     pub worldly: Worldly,
     pub ground_detection: GroundDetection,
-    pub fall_detection: FallDetection,
 
     // The whole EntityInstance can be stored directly as an EntityInstance component
     #[from_entity_instance]
@@ -213,13 +212,4 @@ pub struct GroundDetection {
 pub struct GroundSensor {
     pub ground_detection_entity: Entity,
     pub intersecting_ground_entities: HashSet<Entity>,
-}
-
-/// Events occurring when there's damage made to or by player
-#[derive(Event, Copy, Clone, Debug, PartialEq, Eq)]
-pub enum DamageEvent {
-    /// Event occurring when player gives damage to entity
-    Given(Entity),
-    /// Event occurring when player takes damage from entity
-    Taken(Entity),
 }
